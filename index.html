@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kasir Toko Bebeng</title>
+  
+  <!-- PWA Settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0284c7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kasir Bebeng">
+  <link rel="apple-touch-icon" href="icon.svg">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <span class="brand-icon">🏪</span>
+      <div>
+        <div id="headerStoreName" class="brand-title">TOKO BEBENG</div>
+        <div id="productCountSub" style="font-size: 11px; color: var(--text-muted);">Memuat data...</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="statusBadge" class="status-badge online">
+        <span id="statusDot">●</span> <span id="statusText">Online</span>
+      </div>
+      <button id="btnOpenReport" class="btn-icon" title="Laporan & Riwayat Penjualan">📊</button>
+      <button id="btnOpenSettings" class="btn-icon" title="Pengaturan Printer & Toko">⚙️</button>
+      <button id="btnSync" class="btn-icon" title="Sinkronisasi Turso">🔄</button>
+    </div>
+  </header>
+
+  <!-- Offline Warning Banner -->
+  <div id="offlineBanner">
+    ⚠️ Mode Offline: Transaksi tersimpan lokal di HP & akan otomatis di-sync saat online.
+  </div>
+
+  <!-- Search & Barcode Scanner Bar -->
+  <div class="search-container">
+    <div class="search-box-wrapper">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" class="search-input" placeholder="Ketik nama / scan barcode..." autocomplete="off">
+      <button id="btnClearSearch" class="clear-search-btn">✕</button>
+    </div>
+    <button id="btnOpenScanner" class="btn-scan">
+      <span>📷</span> SCAN
+    </button>
+
+    <!-- Live Search Suggestions Dropdown -->
+    <div id="suggestionsList" class="suggestions-list"></div>
+  </div>
+
+  <!-- Cart List Header -->
+  <div class="cart-header">
+    <span class="cart-title">Keranjang Belanja</span>
+    <button id="btnClearCart" class="btn-clear-cart" style="display: none;">Hapus Semua</button>
+  </div>
+
+  <!-- Cart Items Container -->
+  <div id="cartContainer" class="cart-items-container">
+    <!-- Diisi otomatis oleh JavaScript -->
+  </div>
+
+  <!-- Sticky Bottom Checkout Bar -->
+  <div class="bottom-checkout-bar">
+    <div class="summary-info">
+      <span id="totalItemsLabel" class="summary-items-count">0 Item</span>
+      <span id="totalPriceLabel" class="summary-total-price">Rp 0</span>
+    </div>
+    <button id="btnCheckout" class="btn-checkout" disabled>
+      <span>🛒</span> BAYAR
+    </button>
+  </div>
+
+  <!-- MODAL 1: Barcode Camera Scanner -->
+  <div id="scannerModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📷 Scan Barcode Produk</div>
+        <button id="btnCloseScanner" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <div id="reader"></div>
+        <div style="padding: 14px 18px; background: var(--bg-secondary); border-top: 1px solid var(--border-color);">
+          <div style="font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 8px;">
+            Arahkan kamera ke barcode produk. Atau ketik barcode manual:
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="manualBarcodeInput" class="form-input" placeholder="Ketik kode barcode...">
+            <button id="btnManualBarcodeSubmit" class="btn-scan">Tambah</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Checkout / Pembayaran -->
+  <div id="checkoutModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">Pembayaran Kasir</div>
+        <button id="btnCloseCheckout" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="checkout-total-box">
+          <div class="checkout-total-label">Total Belanja</div>
+          <div id="checkoutTotalVal" class="checkout-total-val">Rp 0</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Pelanggan</label>
+          <select id="customerSelect" class="form-select">
+            <option value="UMUM">UMUM (Pelanggan Biasa)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Uang Diterima (Rp)</label>
+          <input type="number" id="paidInput" class="form-input large" placeholder="0" inputmode="numeric">
+          <div class="quick-cash-row">
+            <button class="btn-quick-cash" data-cash="pas">Uang Pas</button>
+            <button class="btn-quick-cash" data-cash="50000">50.000</button>
+            <button class="btn-quick-cash" data-cash="100000">100.000</button>
+            <button class="btn-quick-cash" data-cash="200000">200.000</button>
+          </div>
+        </div>
+
+        <div class="change-display-box">
+          <div id="changeLabel" class="change-label">Kembalian</div>
+          <div id="changeVal" class="change-val ok">Rp 0</div>
+        </div>
+
+        <button id="btnSubmitOrder" class="btn-submit-order">
+          SELESAI TRANSAKSI
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Struk Pembayaran (Presisi 80mm) -->
+  <div id="receiptModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">🧾 Struk Pembayaran (80mm)</div>
+        <button id="btnCloseReceipt" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Area Kertas Struk yang Presisi -->
+        <div class="receipt-wrapper-box">
+          <div id="receiptPaper" class="receipt-paper">
+            <!-- Diisi otomatis dengan layout HTML flexbox yang presisi -->
+          </div>
+        </div>
+
+        <div class="receipt-actions">
+          <button id="btnPrintReceipt" class="btn-receipt print">🖨️ Cetak Struk (80mm)</button>
+          <button id="btnShareWA" class="btn-receipt wa">💬 Kirim ke WhatsApp</button>
+          <button id="btnNewOrder" class="btn-receipt new">➕ Transaksi Baru</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: Laporan & Riwayat Penjualan Lengkap -->
+  <div id="reportModal" class="modal-overlay">
+    <div class="modal-content" style="max-height: 92vh;">
+      <div class="modal-header">
+        <div class="modal-title">📊 Laporan & Riwayat Penjualan</div>
+        <button id="btnCloseReport" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Filter Tabs Periode -->
+        <div class="filter-tabs-row">
+          <button class="tab-btn active" data-period="today">Hari Ini</button>
+          <button class="tab-btn" data-period="yesterday">Kemarin</button>
+          <button class="tab-btn" data-period="week">7 Hari Terakhir</button>
+          <button class="tab-btn" data-period="month">Bulan Ini</button>
+          <button class="tab-btn" data-period="all">Semua Riwayat</button>
+        </div>
+
+        <!-- Ringkasan Metrik Omset -->
+        <div class="report-summary-grid">
+          <div class="metric-card full">
+            <div class="metric-label">Total Omset Penjualan</div>
+            <div id="reportTotalOmset" class="metric-val emerald">Rp 0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Jumlah Nota</div>
+            <div id="reportTotalNota" class="metric-val">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Barang Terjual</div>
+            <div id="reportTotalItems" class="metric-val">0 Pcs</div>
+          </div>
+        </div>
+
+        <!-- Daftar Riwayat Transaksi -->
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
+          Daftar Nota Transaksi
+        </div>
+        <div id="reportListContainer" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Diisi otomatis oleh JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: Detail Transaksi Tertentu (Dari Laporan) -->
+  <div id="txDetailModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div id="txDetailTitle" class="modal-title">Rincian Nota</div>
+        <button id="btnCloseTxDetail" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="txDetailInfoBox" style="background: var(--bg-primary); border-radius: 10px; padding: 12px; margin-bottom: 12px; font-size: 13px;">
+          <!-- Info Nota -->
+        </div>
+        <div id="txDetailItemsContainer" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+          <!-- Rincian Barang -->
+        </div>
+        <div class="receipt-actions">
+          <button id="btnDetailPrint" class="btn-receipt print">🖨️ Cetak Ulang Struk</button>
+          <button id="btnDetailWA" class="btn-receipt wa">💬 Kirim WA</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: Pengaturan Toko & Printer Thermal -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">⚙️ Pengaturan Kasir & Printer</div>
+        <button id="btnCloseSettings" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Lebar Kertas Printer Thermal</label>
+          <select id="cfgPaperWidth" class="form-select">
+            <option value="80" selected>80 mm (Printer Thermal Standar Kasir - Lebar)</option>
+            <option value="58">58 mm (Printer Thermal Mini Saku)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nama Toko di Struk</label>
+          <input type="text" id="cfgStoreName" class="form-input" value="TOKO BEBENG">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alamat Toko</label>
+          <input type="text" id="cfgStoreAddress" class="form-input" value="Jl. Kosambi No. 8, Bandung">
+        </div>
+        <div class="form-group">
+          <label class="form-label">No. Telepon / HP</label>
+          <input type="text" id="cfgStorePhone" class="form-input" value="08123456789">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pesan Catatan Kaki (Footer Struk)</label>
+          <textarea id="cfgStoreFooter" class="form-input" rows="3" style="resize: none;">Terima Kasih Atas Kunjungan Anda
+Barang yang sudah dibeli
+tidak dapat ditukar/dikembalikan</textarea>
+        </div>
+        <button id="btnSaveSettings" class="btn-submit-order" style="background: var(--accent-sky); color: white;">
+          💾 Simpan Pengaturan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ELEMEN KHUSUS CETAK CETAK THERMAL 80MM (Hanya aktif saat window.print()) -->
+  <div id="printableReceiptArea" style="display: none;"></div>
+
+  <!-- Toast Notification -->
+  <div id="toast">Notifikasi</div>
+
+  <!-- Library Barcode Scanner -->
+  <script src="html5-qrcode.min.js"></script>
+  <!-- Main Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
