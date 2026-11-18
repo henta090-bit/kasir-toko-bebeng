@@ -962,6 +962,41 @@ function showReceiptModal(tx) {
   receiptModal.classList.add('active');
 }
 
+// Fungsi Cetak Langsung RawBT (Rol Kertas Panjang Tanpa Batas Halaman)
+function printToRawBT(tx) {
+  if (!tx) return;
+  const text = buildPlainTextReceipt(tx);
+  try {
+    const utf8Bytes = new TextEncoder().encode(text);
+    let binary = '';
+    for (let i = 0; i < utf8Bytes.length; i++) {
+      binary += String.fromCharCode(utf8Bytes[i]);
+    }
+    const b64 = btoa(binary);
+    window.location.href = "rawbt:data:base64," + b64;
+  } catch (e) {
+    window.location.href = "rawbt:data:base64," + btoa(unescape(encodeURIComponent(text)));
+  }
+}
+
+const btnPrintRawBT = document.getElementById('btnPrintRawBT');
+if (btnPrintRawBT) {
+  btnPrintRawBT.addEventListener('click', () => {
+    if (state.activeTransaction) {
+      printToRawBT(state.activeTransaction);
+    }
+  });
+}
+
+const btnDetailRawBT = document.getElementById('btnDetailRawBT');
+if (btnDetailRawBT) {
+  btnDetailRawBT.addEventListener('click', () => {
+    if (activeDetailTx) {
+      printToRawBT(activeDetailTx);
+    }
+  });
+}
+
 btnCloseReceipt.addEventListener('click', () => receiptModal.classList.remove('active'));
 btnNewOrder.addEventListener('click', () => {
   receiptModal.classList.remove('active');
