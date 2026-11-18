@@ -37,7 +37,8 @@ let state = {
   isScanning: false,
   scannerInstance: null,
   activeTransaction: null,
-  reportPeriod: 'today'
+  reportPeriod: 'today',
+  scannerMode: 'cart' // 'cart' | 'scanToEdit' | 'fillBarcode'
 };
 
 // ==========================================
@@ -177,7 +178,7 @@ async function syncWithTurso(showNotice = false) {
 
   try {
     const products = await queryTurso(
-      "SELECT sku, barcode_slop, name, selling_price, wholesale_price, category FROM products WHERE is_active = 1 ORDER BY name ASC"
+      "SELECT sku, barcode_slop, name, purchase_price, selling_price, wholesale_price, category FROM products WHERE is_active = 1 ORDER BY name ASC"
     );
     if (products && products.length > 0) {
       state.products = products.map(p => ({
@@ -185,6 +186,7 @@ async function syncWithTurso(showNotice = false) {
         barcode: p.barcode_slop || "",
         name: p.name,
         price: parseFloat(p.selling_price) || 0,
+        purchase_price: parseFloat(p.purchase_price) || 0,
         wholesale_price: parseFloat(p.wholesale_price) || 0,
         category: p.category || ""
       }));
@@ -470,6 +472,7 @@ const manualBarcodeInput = document.getElementById('manualBarcodeInput');
 const btnManualBarcodeSubmit = document.getElementById('btnManualBarcodeSubmit');
 
 btnOpenScanner.addEventListener('click', () => {
+  state.scannerMode = 'cart';
   scannerModal.classList.add('active');
   startScanner();
 });
@@ -527,6 +530,35 @@ function handleBarcodeScanned(barcode) {
   barcode = String(barcode).trim();
   if (!barcode) return;
 
+  if (state.scannerMode === 'scanToEdit') {
+    stopScanner();
+    scannerModal.classList.remove('active');
+    const product = state.products.find(p => 
+      (p.barcode && p.barcode.toLowerCase() === barcode.toLowerCase()) || p.sku.toLowerCase() === barcode.toLowerCase()
+    );
+    if (product) {
+      playBeep(880, 0.1);
+      openEditProductModal(product.sku);
+    } else {
+      playBeep(440, 0.2);
+      if (confirm(`Barcode '${barcode}' belum terdaftar di database.\nIngin menambahkannya sebagai barang baru sekarang?`)) {
+        openNewProductModal(barcode);
+      }
+    }
+    return;
+  }
+
+  if (state.scannerMode === 'fillBarcode') {
+    stopScanner();
+    scannerModal.classList.remove('active');
+    const barcodeInput = document.getElementById('formProductBarcode');
+    if (barcodeInput) barcodeInput.value = barcode;
+    playBeep(880, 0.1);
+    showToast(`Barcode ${barcode} terpilih`);
+    return;
+  }
+
+  // Default: mode belanja (cart)
   const product = state.products.find(p => 
     (p.barcode && p.barcode === barcode) || p.sku === barcode
   );
@@ -1345,8 +1377,356 @@ btnSaveSettings.addEventListener('click', () => {
   showToast(`✅ Pengaturan tersimpan (Printer ${storeConfig.paper_width}mm)`);
 });
 
+// =============================================================================
+// 12. MASTER BARANG & UBAH HARGA
+// =============================================================================
+const btnOpenProducts = document.getElementById('btnOpenProducts');
+const productsModal = document.getElementById('productsModal');
+const btnCloseProducts = document.getElementById('btnCloseProducts');
+const btnAddNewProduct = document.getElementById('btnAddNewProduct');
+const btnScanToEdit = document.getElementById('btnScanToEdit');
+const productManagerSearch = document.getElementById('productManagerSearch');
+const productManagerList = document.getElementById('productManagerList');
+
+const productFormModal = document.getElementById('productFormModal');
+const productFormTitle = document.getElementById('productFormTitle');
+const btnCloseProductForm = document.getElementById('btnCloseProductForm');
+const formProductSku = document.getElementById('formProductSku');
+const formIsEditMode = document.getElementById('formIsEditMode');
+const formProductBarcode = document.getElementById('formProductBarcode');
+const btnScanBarcodeForForm = document.getElementById('btnScanBarcodeForForm');
+const formProductName = document.getElementById('formProductName');
+const formProductSellingPrice = document.getElementById('formProductSellingPrice');
+const formProductPurchasePrice = document.getElementById('formProductPurchasePrice');
+const formProductCategory = document.getElementById('formProductCategory');
+const btnSaveProduct = document.getElementById('btnSaveProduct');
+const btnDeleteProduct = document.getElementById('btnDeleteProduct');
+
+if (btnOpenProducts) {
+  btnOpenProducts.addEventListener('click', () => {
+    productManagerSearch.value = '';
+    renderProductManagerList();
+    productsModal.classList.add('active');
+  });
+}
+
+if (btnCloseProducts) {
+  btnCloseProducts.addEventListener('click', () => {
+    productsModal.classList.remove('active');
+  });
+}
+
+if (productManagerSearch) {
+  productManagerSearch.addEventListener('input', (e) => {
+    renderProductManagerList(e.target.value.trim());
+  });
+}
+
+function renderProductManagerList(filterText = '') {
+  const query = filterText.toLowerCase();
+  let list = state.products;
+
+  if (query) {
+    list = list.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      (p.barcode && p.barcode.toLowerCase().includes(query)) ||
+      p.sku.toLowerCase().includes(query) ||
+      (p.category && p.category.toLowerCase().includes(query))
+    );
+  }
+
+  const displayList = list.slice(0, 50);
+
+  if (displayList.length === 0) {
+    productManagerList.innerHTML = `
+      <div style="text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 13px;">
+        🔍 Barang tidak ditemukan.<br>
+        <button id="btnQuickCreateFromSearch" class="btn-scan" style="margin-top: 12px; display: inline-flex;">
+          ➕ Tambah Sebagai Barang Baru
+        </button>
+      </div>
+    `;
+    const btnQuick = document.getElementById('btnQuickCreateFromSearch');
+    if (btnQuick) {
+      btnQuick.addEventListener('click', () => {
+        openNewProductModal('', filterText);
+      });
+    }
+    return;
+  }
+
+  let html = '';
+  displayList.forEach(p => {
+    html += `
+      <div class="product-manage-card">
+        <div class="product-manage-info">
+          <div class="product-manage-name">${escapeHtml(p.name)}</div>
+          <div class="product-manage-meta">
+            ${p.barcode ? `Barcode: <b style="color: var(--accent-sky);">${escapeHtml(p.barcode)}</b>` : `SKU: ${escapeHtml(p.sku)}`}
+            ${p.purchase_price ? ` • Modal: ${formatRupiah(p.purchase_price)}` : ''}
+            ${p.category ? ` • ${escapeHtml(p.category)}` : ''}
+          </div>
+        </div>
+        <div class="product-manage-prices">
+          <div style="font-size: 15px; font-weight: 800; color: var(--accent-emerald);">
+            ${formatRupiah(p.price)}
+          </div>
+          <button class="btn-edit-price" data-sku="${escapeHtml(p.sku)}">
+            ✏️ Ubah
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  if (list.length > 50) {
+    html += `
+      <div style="text-align: center; padding: 10px; font-size: 12px; color: var(--text-muted);">
+        Menampilkan 50 dari ${list.length} barang. Ketik nama/barcode lebih spesifik untuk menyaring.
+      </div>
+    `;
+  }
+
+  productManagerList.innerHTML = html;
+
+  const editButtons = productManagerList.querySelectorAll('.btn-edit-price');
+  editButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const sku = e.currentTarget.getAttribute('data-sku');
+      openEditProductModal(sku);
+    });
+  });
+}
+
+if (btnAddNewProduct) {
+  btnAddNewProduct.addEventListener('click', () => {
+    openNewProductModal();
+  });
+}
+
+if (btnScanToEdit) {
+  btnScanToEdit.addEventListener('click', () => {
+    state.scannerMode = 'scanToEdit';
+    scannerModal.classList.add('active');
+    startScanner();
+  });
+}
+
+if (btnScanBarcodeForForm) {
+  btnScanBarcodeForForm.addEventListener('click', () => {
+    state.scannerMode = 'fillBarcode';
+    scannerModal.classList.add('active');
+    startScanner();
+  });
+}
+
+function openNewProductModal(prefillBarcode = '', prefillName = '') {
+  productFormTitle.innerText = "➕ Tambah Barang Baru";
+  formIsEditMode.value = "0";
+  formProductSku.value = "";
+  formProductBarcode.value = prefillBarcode || "";
+  formProductName.value = prefillName || "";
+  formProductSellingPrice.value = "";
+  formProductPurchasePrice.value = "";
+  formProductCategory.value = "";
+  btnDeleteProduct.style.display = 'none';
+
+  productFormModal.classList.add('active');
+  setTimeout(() => {
+    if (!formProductName.value) {
+      formProductName.focus();
+    } else {
+      formProductSellingPrice.focus();
+    }
+  }, 200);
+}
+
+function openEditProductModal(sku) {
+  const product = state.products.find(p => p.sku === sku);
+  if (!product) {
+    showToast("⚠️ Data barang tidak ditemukan");
+    return;
+  }
+
+  productFormTitle.innerText = "✏️ Ubah Harga & Barang";
+  formIsEditMode.value = "1";
+  formProductSku.value = product.sku;
+  formProductBarcode.value = product.barcode || "";
+  formProductName.value = product.name;
+  formProductSellingPrice.value = product.price || "";
+  formProductPurchasePrice.value = product.purchase_price || "";
+  formProductCategory.value = product.category || "";
+  btnDeleteProduct.style.display = 'block';
+
+  productFormModal.classList.add('active');
+  setTimeout(() => {
+    formProductSellingPrice.focus();
+    formProductSellingPrice.select();
+  }, 200);
+}
+
+if (btnCloseProductForm) {
+  btnCloseProductForm.addEventListener('click', () => {
+    productFormModal.classList.remove('active');
+  });
+}
+
+if (btnSaveProduct) {
+  btnSaveProduct.addEventListener('click', async () => {
+    const isEdit = formIsEditMode.value === "1";
+    let sku = formProductSku.value.trim();
+    const barcode = formProductBarcode.value.trim();
+    const name = formProductName.value.trim();
+    const sellingPrice = parseFloat(formProductSellingPrice.value) || 0;
+    const purchasePrice = parseFloat(formProductPurchasePrice.value) || 0;
+    const category = formProductCategory.value.trim();
+
+    if (!name) {
+      alert("Nama barang wajib diisi!");
+      formProductName.focus();
+      return;
+    }
+
+    if (sellingPrice <= 0) {
+      alert("Harga jual wajib diisi dan harus lebih dari 0!");
+      formProductSellingPrice.focus();
+      return;
+    }
+
+    btnSaveProduct.disabled = true;
+    btnSaveProduct.innerText = "⏳ Menyimpan ke Turso Cloud...";
+
+    try {
+      if (!isEdit) {
+        if (!sku) {
+          sku = "B-" + Date.now().toString().slice(-6);
+        }
+
+        const existSku = state.products.find(p => p.sku.toLowerCase() === sku.toLowerCase());
+        if (existSku) {
+          sku = "B-" + Date.now().toString().slice(-7);
+        }
+
+        if (barcode) {
+          const existBarcode = state.products.find(p => p.barcode && p.barcode.toLowerCase() === barcode.toLowerCase());
+          if (existBarcode) {
+            if (!confirm(`Barcode '${barcode}' sudah dipakai barang:\n"${existBarcode.name}"\nTetap gunakan barcode ini?`)) {
+              btnSaveProduct.disabled = false;
+              btnSaveProduct.innerText = "💾 SIMPAN KE CLOUD TURSO";
+              return;
+            }
+          }
+        }
+
+        const sql = `
+          INSERT INTO products (sku, barcode_slop, name, purchase_price, selling_price, wholesale_price, category, is_active, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+        `;
+        const args = [sku, barcode, name, purchasePrice, sellingPrice, 0, category];
+
+        await queryTurso(sql, args);
+
+        const newProduct = {
+          sku,
+          barcode,
+          name,
+          price: sellingPrice,
+          purchase_price: purchasePrice,
+          wholesale_price: 0,
+          category
+        };
+        state.products.unshift(newProduct);
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(state.products));
+        updateProductCountDisplay();
+
+        productFormModal.classList.remove('active');
+        renderProductManagerList(productManagerSearch.value);
+        showToast(`✅ Barang '${name}' berhasil ditambahkan!`);
+        playBeep(880, 0.15);
+
+      } else {
+        const sql = `
+          UPDATE products
+          SET barcode_slop = ?, name = ?, selling_price = ?, purchase_price = ?, category = ?, updated_at = datetime('now')
+          WHERE sku = ?
+        `;
+        const args = [barcode, name, sellingPrice, purchasePrice, category, sku];
+
+        await queryTurso(sql, args);
+
+        const target = state.products.find(p => p.sku === sku);
+        if (target) {
+          target.barcode = barcode;
+          target.name = name;
+          target.price = sellingPrice;
+          target.purchase_price = purchasePrice;
+          target.category = category;
+        }
+
+        const cartItem = state.cart.find(c => c.sku === sku);
+        if (cartItem) {
+          cartItem.price = sellingPrice;
+          cartItem.name = name;
+          cartItem.subtotal = cartItem.qty * cartItem.price;
+          renderCart();
+        }
+
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(state.products));
+
+        productFormModal.classList.remove('active');
+        renderProductManagerList(productManagerSearch.value);
+        showToast(`✅ Harga '${name}' diubah jadi ${formatRupiah(sellingPrice)}!`);
+        playBeep(880, 0.15);
+      }
+    } catch (err) {
+      console.error("Gagal simpan barang:", err);
+      alert("⚠️ Gagal menyimpan ke Cloud Turso: " + (err.message || err));
+    } finally {
+      btnSaveProduct.disabled = false;
+      btnSaveProduct.innerText = "💾 SIMPAN KE CLOUD TURSO";
+    }
+  });
+}
+
+if (btnDeleteProduct) {
+  btnDeleteProduct.addEventListener('click', async () => {
+    const sku = formProductSku.value.trim();
+    const name = formProductName.value.trim();
+    if (!sku) return;
+
+    if (!confirm(`Hapus barang "${name}"?\n(Barang tidak akan muncul lagi di pencarian kasir)`)) {
+      return;
+    }
+
+    btnDeleteProduct.disabled = true;
+    btnDeleteProduct.innerText = "⏳ Menghapus...";
+
+    try {
+      const sql = `UPDATE products SET is_active = 0, updated_at = datetime('now') WHERE sku = ?`;
+      await queryTurso(sql, [sku]);
+
+      state.products = state.products.filter(p => p.sku !== sku);
+      state.cart = state.cart.filter(c => c.sku !== sku);
+      renderCart();
+
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(state.products));
+      updateProductCountDisplay();
+
+      productFormModal.classList.remove('active');
+      renderProductManagerList(productManagerSearch.value);
+      showToast(`🗑️ Barang '${name}' berhasil dihapus.`);
+    } catch (err) {
+      console.error("Gagal hapus barang:", err);
+      alert("⚠️ Gagal menghapus barang: " + (err.message || err));
+    } finally {
+      btnDeleteProduct.disabled = false;
+      btnDeleteProduct.innerText = "🗑️ Hapus Barang Ini";
+    }
+  });
+}
+
 // ==========================================
-// 12. EVENT LISTENERS GLOBAL & INISIALISASI
+// 13. EVENT LISTENERS GLOBAL & INISIALISASI
 // ==========================================
 document.getElementById('btnClearCart').addEventListener('click', clearCart);
 document.getElementById('btnSync').addEventListener('click', () => syncWithTurso(true));
