@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="Kasir Bebeng">
   <link rel="apple-touch-icon" href="icon.svg">
   
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -30,6 +30,7 @@
       <div id="statusBadge" class="status-badge online">
         <span id="statusDot">●</span> <span id="statusText">Online</span>
       </div>
+      <button id="btnOpenProducts" class="btn-icon" title="Kelola Barang & Ubah Harga">📦</button>
       <button id="btnOpenReport" class="btn-icon" title="Laporan & Riwayat Penjualan">📊</button>
       <button id="btnOpenSettings" class="btn-icon" title="Pengaturan Printer & Toko">⚙️</button>
       <button id="btnSync" class="btn-icon" title="Sinkronisasi Turso">🔄</button>
@@ -279,6 +280,85 @@ tidak dapat ditukar/dikembalikan</textarea>
     </div>
   </div>
 
+  <!-- MODAL 7: Kelola Master Barang & Editor Harga -->
+  <div id="productsModal" class="modal-overlay">
+    <div class="modal-content" style="max-height: 92vh;">
+      <div class="modal-header">
+        <div class="modal-title">📦 Master Barang & Ubah Harga</div>
+        <button id="btnCloseProducts" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <button id="btnAddNewProduct" class="btn-scan" style="flex: 1; padding: 12px; font-size: 13px; justify-content: center;">
+            ➕ Tambah Barang Baru
+          </button>
+          <button id="btnScanToEdit" class="btn-icon" style="width: 44px; height: 44px; border-radius: 12px;" title="Scan Barcode untuk Ubah Harga">
+            📷
+          </button>
+        </div>
+
+        <div class="search-box-wrapper" style="margin-bottom: 12px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="productManagerSearch" class="search-input" placeholder="Cari barang yang mau diedit...">
+        </div>
+
+        <div id="productManagerList" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Diisi otomatis oleh JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 8: Form Tambah / Edit Barang -->
+  <div id="productFormModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div id="productFormTitle" class="modal-title">Tambah Barang Baru</div>
+        <button id="btnCloseProductForm" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="formProductSku">
+        <input type="hidden" id="formIsEditMode" value="0">
+
+        <div class="form-group">
+          <label class="form-label">Barcode / PLU</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="formProductBarcode" class="form-input" placeholder="Scan atau ketik barcode...">
+            <button id="btnScanBarcodeForForm" class="btn-scan" style="padding: 0 14px;" type="button">📷 Scan</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nama Barang *</label>
+          <input type="text" id="formProductName" class="form-input" placeholder="Contoh: K.API 150 GR" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Harga Jual (Rp) *</label>
+          <input type="number" id="formProductSellingPrice" class="form-input large" placeholder="0" inputmode="numeric" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Harga Beli / Modal (Rp)</label>
+          <input type="number" id="formProductPurchasePrice" class="form-input" placeholder="0" inputmode="numeric">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Kategori (Opsional)</label>
+          <input type="text" id="formProductCategory" class="form-input" placeholder="Contoh: ROKOK, MINUMAN, SEMBAKO">
+        </div>
+
+        <button id="btnSaveProduct" class="btn-submit-order" style="background: var(--accent-emerald); margin-top: 8px;">
+          💾 SIMPAN KE CLOUD TURSO
+        </button>
+
+        <button id="btnDeleteProduct" class="btn-submit-order" style="background: var(--accent-rose); margin-top: 8px; display: none;">
+          🗑️ Hapus Barang Ini
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ELEMEN KHUSUS CETAK CETAK THERMAL 80MM (Hanya aktif saat window.print()) -->
   <div id="printableReceiptArea" style="display: none;"></div>
 
@@ -288,6 +368,6 @@ tidak dapat ditukar/dikembalikan</textarea>
   <!-- Library Barcode Scanner -->
   <script src="html5-qrcode.min.js"></script>
   <!-- Main Application Logic -->
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
