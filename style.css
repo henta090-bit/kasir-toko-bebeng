@@ -746,12 +746,14 @@ header {
     left: 0 !important;
     top: 0 !important;
     width: 76mm !important; /* Printable area untuk printer thermal 80mm */
-    padding: 3mm 4mm !important;
+    padding: 1mm 2mm !important;
     font-family: 'Consolas', 'Courier New', monospace !important;
-    font-size: 12px !important;
-    line-height: 1.35 !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
     color: #000000 !important;
     background: #ffffff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 
