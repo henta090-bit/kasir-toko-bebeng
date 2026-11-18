@@ -831,6 +831,60 @@ header {
   border-color: var(--accent-sky);
 }
 
+/* ========================================================================= */
+/* KELOLA MASTER BARANG & EDITOR HARGA                                       */
+/* ========================================================================= */
+.product-manage-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.product-manage-info {
+  flex: 1;
+  min-width: 0;
+}
+.product-manage-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+.product-manage-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.product-manage-prices {
+  text-align: right;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.btn-edit-price {
+  background: rgba(2, 132, 199, 0.15);
+  color: var(--accent-sky);
+  border: 1px solid var(--accent-sky);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-edit-price:active {
+  background: var(--accent-sky);
+  color: #fff;
+}
+
 /* Toast Notification */
 #toast {
   position: fixed;
