@@ -16,7 +16,9 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'bebeng_customers_cache',
   OFFLINE_QUEUE: 'bebeng_offline_queue',
   HISTORY: 'bebeng_tx_history',
-  CONFIG: 'bebeng_printer_config'
+  CONFIG: 'bebeng_printer_config',
+  USERS: 'bebeng_users_cache',
+  ACTIVE_USER: 'bebeng_active_user'
 };
 
 // Default Konfigurasi Toko & Printer (Lebar 80mm)
@@ -32,6 +34,8 @@ let storeConfig = {
 let state = {
   products: [],
   customers: [],
+  users: [],
+  currentUser: null,
   cart: [],
   isOnline: navigator.onLine,
   isScanning: false,
@@ -161,12 +165,36 @@ function loadCachedData() {
     } catch (e) {}
   }
 
+  const cachedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+  if (cachedUsers) {
+    try {
+      state.users = JSON.parse(cachedUsers);
+    } catch (e) {}
+  }
+  if (!state.users || state.users.length === 0) {
+    state.users = [
+      { username: 'admin', name: 'Owner / Admin', pin: '1234', role: 'admin' },
+      { username: 'kasir1', name: 'Kasir 1', pin: '1111', role: 'kasir' }
+    ];
+  }
+  renderLoginUserOptions();
+
+  const savedActiveUser = localStorage.getItem(STORAGE_KEYS.ACTIVE_USER);
+  if (savedActiveUser) {
+    try {
+      state.currentUser = JSON.parse(savedActiveUser);
+    } catch (e) {}
+  }
+
+  applyUserRolePermissions();
   checkOfflineQueue();
 }
 
 function updateProductCountDisplay() {
-  const sub = document.getElementById('productCountSub');
-  sub.innerText = `${state.products.length} Produk Siap`;
+  const countEl = document.getElementById('productCountText');
+  if (countEl) {
+    countEl.innerText = `${state.products.length} Produk`;
+  }
 }
 
 async function syncWithTurso(showNotice = false) {
@@ -201,6 +229,27 @@ async function syncWithTurso(showNotice = false) {
       state.customers = customers;
       localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(state.customers));
       renderCustomerOptions();
+    }
+
+    try {
+      const users = await queryTurso(
+        "SELECT username, name, pin, role FROM pos_users WHERE is_active = 1 ORDER BY role DESC, name ASC"
+      );
+      if (users && users.length > 0) {
+        state.users = users;
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
+        renderLoginUserOptions();
+        if (state.currentUser) {
+          const fresh = state.users.find(u => u.username === state.currentUser.username);
+          if (fresh) {
+            state.currentUser = fresh;
+            localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(fresh));
+            applyUserRolePermissions();
+          }
+        }
+      }
+    } catch (eu) {
+      console.warn("User sync skipped:", eu);
     }
 
     await flushOfflineQueue();
@@ -679,11 +728,16 @@ btnSubmitOrder.addEventListener('click', async () => {
   const transactionDate = `${yyyy}-${mm}-${dd}`;
   const transactionTime = `${hh}:${min}:${ss}`;
 
+  const cashierName = state.currentUser ? state.currentUser.name : "Kasir";
+  const cashierId = state.currentUser ? state.currentUser.username : "kasir";
+
   const transactionData = {
     receipt_number: receiptNumber,
     transaction_date: transactionDate,
     transaction_time: transactionTime,
     customer_code: customerCode,
+    cashier_id: cashierId,
+    cashier_name: cashierName,
     subtotal: total,
     grand_total: total,
     paid: paid,
@@ -725,7 +779,7 @@ async function saveTransaction(tx) {
   `;
   const receiptArgs = [
     tx.receipt_number, tx.transaction_date, tx.subtotal, tx.grand_total,
-    tx.customer_code, new Date().toISOString()
+    tx.cashier_id || "kasir", new Date().toISOString()
   ];
 
   const itemStatements = tx.items.map((item, idx) => {
@@ -739,7 +793,7 @@ async function saveTransaction(tx) {
 
     return {
       sql: `INSERT INTO pos_receipt_items (id, receipt_number, product_sku, quantity, unit_price, transaction_date, transaction_time, cashier_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [safeId, tx.receipt_number, item.sku, item.qty, item.price, tx.transaction_date, tx.transaction_time, tx.customer_code]
+      args: [safeId, tx.receipt_number, item.sku, item.qty, item.price, tx.transaction_date, tx.transaction_time, tx.cashier_id || "kasir"]
     };
   });
 
@@ -912,7 +966,8 @@ function buildHtmlReceipt(tx) {
     <div class="receipt-divider-double"></div>
     <div class="receipt-meta-row"><span>No. Nota:</span> <span>${escapeHtml(tx.receipt_number)}</span></div>
     <div class="receipt-meta-row"><span>Tanggal :</span> <span>${tx.transaction_date} ${tx.transaction_time}</span></div>
-    <div class="receipt-meta-row"><span>Pelanggan:</span> <span>${escapeHtml(tx.customer_code)}</span></div>
+    <div class="receipt-meta-row"><span>Kasir   :</span> <span>${escapeHtml(tx.cashier_name || tx.cashier_id || 'KASIR')}</span></div>
+    <div class="receipt-meta-row"><span>Plg     :</span> <span>${escapeHtml(tx.customer_code)}</span></div>
     <div class="receipt-divider"></div>
     <div class="receipt-items-table">
       ${itemsHtml}
@@ -948,9 +1003,10 @@ function buildPlainTextReceipt(tx) {
   out += centerText(storeConfig.store_address, w) + "\n";
   out += centerText("Telp: " + storeConfig.store_phone, w) + "\n";
   out += dLine + "\n";
-  out += `No : ${tx.receipt_number}\n`;
-  out += `Tgl: ${tx.transaction_date} ${tx.transaction_time}\n`;
-  out += `Plg: ${tx.customer_code}\n`;
+  out += `No   : ${tx.receipt_number}\n`;
+  out += `Tgl  : ${tx.transaction_date} ${tx.transaction_time}\n`;
+  out += `Kasir: ${tx.cashier_name || tx.cashier_id || "KASIR"}\n`;
+  out += `Plg  : ${tx.customer_code}\n`;
   out += line + "\n";
 
   tx.items.forEach(it => {
@@ -1062,6 +1118,10 @@ const reportTotalItems = document.getElementById('reportTotalItems');
 const reportListContainer = document.getElementById('reportListContainer');
 
 btnOpenReport.addEventListener('click', () => {
+  if (state.currentUser?.role !== 'admin') {
+    alert("⚠️ Akses Dibatasi!\nLaporan penjualan & omset toko hanya dapat dibuka oleh Akun Owner/Admin.");
+    return;
+  }
   reportModal.classList.add('active');
   loadReportData(state.reportPeriod);
 });
@@ -1353,6 +1413,10 @@ const cfgStoreFooter = document.getElementById('cfgStoreFooter');
 const btnSaveSettings = document.getElementById('btnSaveSettings');
 
 btnOpenSettings.addEventListener('click', () => {
+  if (state.currentUser?.role !== 'admin') {
+    alert("⚠️ Akses Dibatasi!\nPengaturan toko & printer hanya dapat diakses oleh Akun Owner/Admin.");
+    return;
+  }
   cfgPaperWidth.value = String(storeConfig.paper_width);
   cfgStoreName.value = storeConfig.store_name;
   cfgStoreAddress.value = storeConfig.store_address;
@@ -1404,6 +1468,10 @@ const btnDeleteProduct = document.getElementById('btnDeleteProduct');
 
 if (btnOpenProducts) {
   btnOpenProducts.addEventListener('click', () => {
+    if (state.currentUser?.role !== 'admin') {
+      alert("⚠️ Akses Dibatasi!\nHanya Akun Owner/Admin yang diizinkan untuk mengelola barang dan mengubah harga.");
+      return;
+    }
     productManagerSearch.value = '';
     renderProductManagerList();
     productsModal.classList.add('active');
@@ -1725,8 +1793,352 @@ if (btnDeleteProduct) {
   });
 }
 
+// =============================================================================
+// 13. KELOLA PENGGUNA, LOGIN & HAK AKSES (RBAC)
+// =============================================================================
+const loginOverlay = document.getElementById('loginOverlay');
+const loginUserSelect = document.getElementById('loginUserSelect');
+const loginPinInput = document.getElementById('loginPinInput');
+const btnLoginSubmit = document.getElementById('btnLoginSubmit');
+const loginForm = document.getElementById('loginForm');
+
+const btnUserMenu = document.getElementById('btnUserMenu');
+const userModal = document.getElementById('userModal');
+const btnCloseUserModal = document.getElementById('btnCloseUserModal');
+const profileUserName = document.getElementById('profileUserName');
+const profileUserRole = document.getElementById('profileUserRole');
+const btnOpenManageUsers = document.getElementById('btnOpenManageUsers');
+const btnLogout = document.getElementById('btnLogout');
+
+const manageUsersModal = document.getElementById('manageUsersModal');
+const btnCloseManageUsers = document.getElementById('btnCloseManageUsers');
+const btnAddNewUser = document.getElementById('btnAddNewUser');
+const usersListContainer = document.getElementById('usersListContainer');
+
+const userFormModal = document.getElementById('userFormModal');
+const userFormTitle = document.getElementById('userFormTitle');
+const btnCloseUserForm = document.getElementById('btnCloseUserForm');
+const formUserIsEdit = document.getElementById('formUserIsEdit');
+const formUserUsername = document.getElementById('formUserUsername');
+const formUserFullName = document.getElementById('formUserFullName');
+const formUserPin = document.getElementById('formUserPin');
+const formUserRole = document.getElementById('formUserRole');
+const btnSaveUser = document.getElementById('btnSaveUser');
+
+// Touch Numpad Handler
+document.querySelectorAll('.pin-key').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const val = e.currentTarget.getAttribute('data-val');
+    if (!loginPinInput) return;
+    if (val === 'clear') {
+      loginPinInput.value = '';
+    } else if (val === 'del') {
+      loginPinInput.value = loginPinInput.value.slice(0, -1);
+    } else if (val) {
+      if (loginPinInput.value.length < 8) {
+        loginPinInput.value += val;
+      }
+    }
+  });
+});
+
+function renderLoginUserOptions() {
+  if (!loginUserSelect) return;
+  const currentVal = loginUserSelect.value;
+  loginUserSelect.innerHTML = '';
+  state.users.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.username;
+    opt.textContent = `${u.role === 'admin' ? '👑' : '👤'} ${u.name} (${u.role === 'admin' ? 'Owner' : 'Kasir'})`;
+    loginUserSelect.appendChild(opt);
+  });
+  if (currentVal) loginUserSelect.value = currentVal;
+}
+
+function applyUserRolePermissions() {
+  const activeUserBadge = document.getElementById('activeUserBadge');
+  const btnOpenProducts = document.getElementById('btnOpenProducts');
+  const btnOpenReport = document.getElementById('btnOpenReport');
+  const btnOpenSettings = document.getElementById('btnOpenSettings');
+
+  if (!state.currentUser) {
+    if (loginOverlay) loginOverlay.classList.remove('hidden');
+    if (activeUserBadge) activeUserBadge.innerText = '👤 Masuk';
+    if (btnOpenProducts) btnOpenProducts.style.display = 'none';
+    if (btnOpenReport) btnOpenReport.style.display = 'none';
+    if (btnOpenSettings) btnOpenSettings.style.display = 'none';
+    return;
+  }
+
+  // User sudah login
+  if (loginOverlay) loginOverlay.classList.add('hidden');
+  const isAdmin = state.currentUser.role === 'admin';
+
+  if (activeUserBadge) {
+    activeUserBadge.innerText = `${isAdmin ? '👑' : '👤'} ${state.currentUser.name}`;
+  }
+
+  // Tampilkan atau sembunyikan fitur sesuai wewenang
+  if (btnOpenProducts) btnOpenProducts.style.display = isAdmin ? 'inline-flex' : 'none';
+  if (btnOpenReport) btnOpenReport.style.display = isAdmin ? 'inline-flex' : 'none';
+  if (btnOpenSettings) btnOpenSettings.style.display = isAdmin ? 'inline-flex' : 'none';
+}
+
+function handleLogin() {
+  const username = loginUserSelect ? loginUserSelect.value : '';
+  const pin = loginPinInput ? loginPinInput.value.trim() : '';
+
+  if (!username) {
+    alert("Silakan pilih user/kasir terlebih dahulu.");
+    return;
+  }
+  if (!pin) {
+    alert("Silakan masukkan PIN masuk Anda.");
+    if (loginPinInput) loginPinInput.focus();
+    return;
+  }
+
+  const user = state.users.find(u => u.username === username);
+  if (!user) {
+    alert("User tidak ditemukan.");
+    return;
+  }
+
+  if (user.pin !== pin) {
+    playBeep(440, 0.25);
+    alert("❌ PIN yang Anda masukkan salah!");
+    if (loginPinInput) {
+      loginPinInput.value = '';
+      loginPinInput.focus();
+    }
+    return;
+  }
+
+  // Sukses login
+  state.currentUser = user;
+  localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(user));
+  if (loginPinInput) loginPinInput.value = '';
+  applyUserRolePermissions();
+  playBeep(880, 0.12);
+  showToast(`✅ Selamat bertugas, ${user.name}!`);
+}
+
+if (loginForm) {
+  loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleLogin();
+  });
+}
+if (btnLoginSubmit) {
+  btnLoginSubmit.addEventListener('click', (e) => {
+    e.preventDefault();
+    handleLogin();
+  });
+}
+
+if (btnUserMenu) {
+  btnUserMenu.addEventListener('click', () => {
+    if (!state.currentUser) {
+      if (loginOverlay) loginOverlay.classList.remove('hidden');
+      return;
+    }
+    const isAdmin = state.currentUser.role === 'admin';
+    if (profileUserName) profileUserName.innerText = state.currentUser.name;
+    if (profileUserRole) {
+      profileUserRole.innerText = isAdmin ? 'OWNER / ADMIN' : 'KASIR (TRANSAKSI ONLY)';
+      profileUserRole.style.color = isAdmin ? 'var(--accent-emerald)' : 'var(--accent-sky)';
+      profileUserRole.style.background = isAdmin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(2, 132, 199, 0.15)';
+    }
+    if (btnOpenManageUsers) {
+      btnOpenManageUsers.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+    if (userModal) userModal.classList.add('active');
+  });
+}
+
+if (btnCloseUserModal) {
+  btnCloseUserModal.addEventListener('click', () => {
+    if (userModal) userModal.classList.remove('active');
+  });
+}
+
+if (btnLogout) {
+  btnLogout.addEventListener('click', () => {
+    if (confirm("Keluar dari akun kasir dan ganti shift?")) {
+      state.currentUser = null;
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+      if (userModal) userModal.classList.remove('active');
+      if (loginPinInput) loginPinInput.value = '';
+      applyUserRolePermissions();
+      showToast("Telah keluar dari sistem kasir.");
+    }
+  });
+}
+
+if (btnOpenManageUsers) {
+  btnOpenManageUsers.addEventListener('click', () => {
+    if (userModal) userModal.classList.remove('active');
+    renderUsersList();
+    if (manageUsersModal) manageUsersModal.classList.add('active');
+  });
+}
+
+if (btnCloseManageUsers) {
+  btnCloseManageUsers.addEventListener('click', () => {
+    if (manageUsersModal) manageUsersModal.classList.remove('active');
+  });
+}
+
+function renderUsersList() {
+  if (!usersListContainer) return;
+  let html = '';
+  state.users.forEach(u => {
+    const isAdmin = u.role === 'admin';
+    html += `
+      <div class="user-item-card">
+        <div>
+          <div class="user-item-name">${escapeHtml(u.name)}</div>
+          <div class="user-item-meta">
+            Username: <b>${escapeHtml(u.username)}</b> • Peran: <span style="color: ${isAdmin ? 'var(--accent-emerald)' : 'var(--accent-sky)'}; font-weight: 700;">${isAdmin ? 'Owner' : 'Kasir'}</span> • PIN: ••••
+          </div>
+        </div>
+        <div>
+          <button class="btn-edit-price btn-edit-user" data-username="${escapeHtml(u.username)}">
+            ✏️ Ubah PIN
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  usersListContainer.innerHTML = html;
+
+  usersListContainer.querySelectorAll('.btn-edit-user').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const username = e.currentTarget.getAttribute('data-username');
+      openEditUserModal(username);
+    });
+  });
+}
+
+if (btnAddNewUser) {
+  btnAddNewUser.addEventListener('click', () => {
+    if (userFormTitle) userFormTitle.innerText = "➕ Tambah Kasir Baru";
+    if (formUserIsEdit) formUserIsEdit.value = "0";
+    if (formUserUsername) {
+      formUserUsername.value = "";
+      formUserUsername.disabled = false;
+    }
+    if (formUserFullName) formUserFullName.value = "";
+    if (formUserPin) formUserPin.value = "";
+    if (formUserRole) formUserRole.value = "kasir";
+    if (userFormModal) userFormModal.classList.add('active');
+  });
+}
+
+function openEditUserModal(username) {
+  const user = state.users.find(u => u.username === username);
+  if (!user) return;
+  if (userFormTitle) userFormTitle.innerText = `✏️ Ubah Akun & PIN: ${user.name}`;
+  if (formUserIsEdit) formUserIsEdit.value = "1";
+  if (formUserUsername) {
+    formUserUsername.value = user.username;
+    formUserUsername.disabled = true;
+  }
+  if (formUserFullName) formUserFullName.value = user.name;
+  if (formUserPin) formUserPin.value = user.pin;
+  if (formUserRole) formUserRole.value = user.role;
+  if (userFormModal) userFormModal.classList.add('active');
+}
+
+if (btnCloseUserForm) {
+  btnCloseUserForm.addEventListener('click', () => {
+    if (userFormModal) userFormModal.classList.remove('active');
+  });
+}
+
+if (btnSaveUser) {
+  btnSaveUser.addEventListener('click', async () => {
+    const isEdit = formUserIsEdit ? formUserIsEdit.value === "1" : false;
+    const username = formUserUsername ? formUserUsername.value.trim().toLowerCase().replace(/\s+/g, '') : '';
+    const fullName = formUserFullName ? formUserFullName.value.trim() : '';
+    const pin = formUserPin ? formUserPin.value.trim() : '';
+    const role = formUserRole ? formUserRole.value : 'kasir';
+
+    if (!username) {
+      alert("Username wajib diisi!");
+      formUserUsername.focus();
+      return;
+    }
+    if (!fullName) {
+      alert("Nama lengkap kasir wajib diisi!");
+      formUserFullName.focus();
+      return;
+    }
+    if (!pin || pin.length < 4) {
+      alert("PIN wajib diisi minimal 4 digit angka!");
+      formUserPin.focus();
+      return;
+    }
+
+    btnSaveUser.disabled = true;
+    btnSaveUser.innerText = "⏳ Menyimpan Akun...";
+
+    try {
+      if (!isEdit) {
+        const exist = state.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+        if (exist) {
+          alert(`Username '${username}' sudah digunakan.`);
+          btnSaveUser.disabled = false;
+          btnSaveUser.innerText = "💾 Simpan Akun Kasir";
+          return;
+        }
+
+        const sql = `
+          INSERT INTO pos_users (username, name, pin, role, is_active, created_at)
+          VALUES (?, ?, ?, ?, 1, datetime('now'))
+        `;
+        await queryTurso(sql, [username, fullName, pin, role]);
+
+        state.users.push({ username, name: fullName, pin, role });
+      } else {
+        const sql = `
+          UPDATE pos_users
+          SET name = ?, pin = ?, role = ?
+          WHERE username = ?
+        `;
+        await queryTurso(sql, [fullName, pin, role, username]);
+
+        const u = state.users.find(x => x.username === username);
+        if (u) {
+          u.name = fullName;
+          u.pin = pin;
+          u.role = role;
+        }
+        if (state.currentUser && state.currentUser.username === username) {
+          state.currentUser = { ...u };
+          localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(state.currentUser));
+          applyUserRolePermissions();
+        }
+      }
+
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
+      renderLoginUserOptions();
+      renderUsersList();
+      if (userFormModal) userFormModal.classList.remove('active');
+      showToast("✅ Akun kasir berhasil disimpan!");
+      playBeep(880, 0.1);
+    } catch (err) {
+      console.error("Gagal simpan user:", err);
+      alert("⚠️ Gagal menyimpan akun ke Turso: " + (err.message || err));
+    } finally {
+      btnSaveUser.disabled = false;
+      btnSaveUser.innerText = "💾 Simpan Akun Kasir";
+    }
+  });
+}
+
 // ==========================================
-// 13. EVENT LISTENERS GLOBAL & INISIALISASI
+// 14. EVENT LISTENERS GLOBAL & INISIALISASI
 // ==========================================
 document.getElementById('btnClearCart').addEventListener('click', clearCart);
 document.getElementById('btnSync').addEventListener('click', () => syncWithTurso(true));
