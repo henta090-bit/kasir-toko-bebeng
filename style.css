@@ -909,3 +909,109 @@ header {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* ========================================================================= */
+/* LOGIN OVERLAY & PIN KEYPAD                                               */
+/* ========================================================================= */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.25s ease;
+}
+.login-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+  display: none;
+}
+.login-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 380px;
+  padding: 24px 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+.login-header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.login-icon {
+  font-size: 38px;
+  margin-bottom: 4px;
+}
+.login-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--text-main);
+}
+.login-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.pin-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+.pin-key {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 700;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: all 0.15s ease;
+}
+.pin-key:active {
+  background: var(--accent-sky);
+  color: #fff;
+  transform: scale(0.95);
+}
+.pin-key.pin-clear {
+  color: var(--accent-rose);
+  font-size: 16px;
+}
+.pin-key.pin-del {
+  color: var(--accent-amber);
+  font-size: 18px;
+}
+
+.user-item-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.user-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.user-item-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
