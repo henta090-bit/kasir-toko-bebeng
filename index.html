@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="Kasir Bebeng">
   <link rel="apple-touch-icon" href="icon.svg">
   
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -23,16 +23,19 @@
       <span class="brand-icon">🏪</span>
       <div>
         <div id="headerStoreName" class="brand-title">TOKO BEBENG</div>
-        <div id="productCountSub" style="font-size: 11px; color: var(--text-muted);">Memuat data...</div>
+        <div id="productCountSub" style="font-size: 11px; color: var(--text-muted);">
+          <span id="activeUserBadge" style="color: var(--accent-sky); font-weight: 700;">👤 Masuk</span> • <span id="productCountText">Memuat...</span>
+        </div>
       </div>
     </div>
     <div class="header-actions">
       <div id="statusBadge" class="status-badge online">
         <span id="statusDot">●</span> <span id="statusText">Online</span>
       </div>
-      <button id="btnOpenProducts" class="btn-icon" title="Kelola Barang & Ubah Harga">📦</button>
-      <button id="btnOpenReport" class="btn-icon" title="Laporan & Riwayat Penjualan">📊</button>
-      <button id="btnOpenSettings" class="btn-icon" title="Pengaturan Printer & Toko">⚙️</button>
+      <button id="btnOpenProducts" class="btn-icon" title="Kelola Barang & Ubah Harga" style="display: none;">📦</button>
+      <button id="btnOpenReport" class="btn-icon" title="Laporan & Riwayat Penjualan" style="display: none;">📊</button>
+      <button id="btnOpenSettings" class="btn-icon" title="Pengaturan Printer & Toko" style="display: none;">⚙️</button>
+      <button id="btnUserMenu" class="btn-icon" title="Akun Kasir / Ganti Shift">👤</button>
       <button id="btnSync" class="btn-icon" title="Sinkronisasi Turso">🔄</button>
     </div>
   </header>
@@ -359,6 +362,128 @@ tidak dapat ditukar/dikembalikan</textarea>
     </div>
   </div>
 
+  <!-- MODAL 9: Profil Pengguna & Ganti Kasir -->
+  <div id="userModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">👤 Akun Kasir Aktif</div>
+        <button id="btnCloseUserModal" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align: center; padding: 14px 0;">
+          <div style="font-size: 40px; margin-bottom: 4px;">👤</div>
+          <div id="profileUserName" style="font-size: 18px; font-weight: 800;">Admin</div>
+          <div id="profileUserRole" style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 6px; background: rgba(2, 132, 199, 0.2); color: var(--accent-sky);">
+            OWNER / ADMIN
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+          <button id="btnOpenManageUsers" class="btn-scan" style="justify-content: center; padding: 12px; font-size: 13px; display: none;">
+            👥 Kelola Kasir & Ubah PIN
+          </button>
+          <button id="btnLogout" class="btn-submit-order" style="background: var(--accent-rose); margin-top: 4px;">
+            🚪 Keluar / Ganti Shift Kasir
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 10: Kelola Kasir & PIN (Khusus Admin) -->
+  <div id="manageUsersModal" class="modal-overlay">
+    <div class="modal-content" style="max-height: 90vh;">
+      <div class="modal-header">
+        <div class="modal-title">👥 Kelola Akun Kasir & PIN</div>
+        <button id="btnCloseManageUsers" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <button id="btnAddNewUser" class="btn-scan" style="width: 100%; justify-content: center; padding: 12px; margin-bottom: 12px; font-size: 13px;">
+          ➕ Tambah Akun Kasir Baru
+        </button>
+        <div id="usersListContainer" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Diisi otomatis oleh JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 11: Form Tambah/Ubah User & PIN -->
+  <div id="userFormModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div id="userFormTitle" class="modal-title">Tambah Kasir Baru</div>
+        <button id="btnCloseUserForm" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="formUserIsEdit" value="0">
+        <div class="form-group">
+          <label class="form-label">Username (Huruf kecil, tanpa spasi) *</label>
+          <input type="text" id="formUserUsername" class="form-input" placeholder="contoh: siti, budi" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nama Lengkap / Tampilan *</label>
+          <input type="text" id="formUserFullName" class="form-input" placeholder="contoh: Kasir Pagi (Siti)" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">PIN Masuk (4-6 Angka) *</label>
+          <input type="password" id="formUserPin" class="form-input large" placeholder="••••" inputmode="numeric" maxlength="8" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Hak Akses / Peran</label>
+          <select id="formUserRole" class="form-input" style="font-size: 13px;">
+            <option value="kasir">Kasir (Hanya jualan, DILARANG ubah harga)</option>
+            <option value="admin">Owner / Admin (Akses Penuh)</option>
+          </select>
+        </div>
+        <button id="btnSaveUser" class="btn-submit-order" style="background: var(--accent-emerald); margin-top: 10px;">
+          💾 Simpan Akun Kasir
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY LOGIN KASIR & PIN (Full Screen) -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-icon">🏪</div>
+        <div class="login-title">KASIR TOKO BEBENG</div>
+        <div class="login-subtitle">Pilih pengguna & masukkan PIN Anda</div>
+      </div>
+      <form id="loginForm" onsubmit="return false;">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Pilih User / Kasir</label>
+          <select id="loginUserSelect" class="form-input" style="font-weight: 700; font-size: 15px;"></select>
+        </div>
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">PIN Masuk</label>
+          <input type="password" id="loginPinInput" class="form-input large" placeholder="••••" inputmode="numeric" maxlength="8" autocomplete="current-password" required>
+        </div>
+        
+        <!-- Numpad Layar Sentuh Cepat untuk HP -->
+        <div class="pin-numpad">
+          <button type="button" class="pin-key" data-val="1">1</button>
+          <button type="button" class="pin-key" data-val="2">2</button>
+          <button type="button" class="pin-key" data-val="3">3</button>
+          <button type="button" class="pin-key" data-val="4">4</button>
+          <button type="button" class="pin-key" data-val="5">5</button>
+          <button type="button" class="pin-key" data-val="6">6</button>
+          <button type="button" class="pin-key" data-val="7">7</button>
+          <button type="button" class="pin-key" data-val="8">8</button>
+          <button type="button" class="pin-key" data-val="9">9</button>
+          <button type="button" class="pin-key pin-clear" data-val="clear">C</button>
+          <button type="button" class="pin-key" data-val="0">0</button>
+          <button type="button" class="pin-key pin-del" data-val="del">⌫</button>
+        </div>
+
+        <button type="submit" id="btnLoginSubmit" class="btn-submit-order" style="margin-top: 14px;">
+          MASUK KASIR ➜
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- ELEMEN KHUSUS CETAK CETAK THERMAL 80MM (Hanya aktif saat window.print()) -->
   <div id="printableReceiptArea" style="display: none;"></div>
 
@@ -368,6 +493,6 @@ tidak dapat ditukar/dikembalikan</textarea>
   <!-- Library Barcode Scanner -->
   <script src="html5-qrcode.min.js"></script>
   <!-- Main Application Logic -->
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
