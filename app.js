@@ -377,6 +377,7 @@ function renderCart() {
   let totalQty = 0;
   let grandTotal = 0;
 
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
   let html = '';
   state.cart.forEach(item => {
     totalQty += item.qty;
@@ -389,7 +390,13 @@ function renderCart() {
           <button class="item-btn-remove" onclick="removeFromCart('${item.sku}')" title="Hapus">✕</button>
         </div>
         <div class="item-bottom">
-          <div class="item-unit-price">${formatRupiah(item.price)}</div>
+          ${isAdmin ? `
+            <div class="item-unit-price editable-price" onclick="openPriceOverrideModal('${item.sku}', true)" title="Klik untuk atur harga khusus lebaran">
+              <span>${formatRupiah(item.price)}</span> <span class="badge-edit-pencil">✏️</span>
+            </div>
+          ` : `
+            <div class="item-unit-price">${formatRupiah(item.price)}</div>
+          `}
           <div class="qty-control">
             <button class="qty-btn" onclick="updateCartQty('${item.sku}', ${item.qty - 1})">-</button>
             <input type="number" class="qty-input" value="${item.qty}" min="1" 
@@ -437,15 +444,19 @@ searchInput.addEventListener('input', () => {
     return;
   }
 
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
   let html = '';
   matched.forEach(p => {
     html += `
       <div class="suggestion-item" data-sku="${p.sku}">
-        <div>
+        <div style="flex: 1; min-width: 0;">
           <div class="sugg-name">${escapeHtml(p.name)}</div>
           <div class="sugg-meta">${p.barcode ? 'Barcode: ' + p.barcode : 'SKU: ' + p.sku}</div>
         </div>
-        <div class="sugg-price">${formatRupiah(p.price)}</div>
+        <div class="sugg-right">
+          <div class="sugg-price">${formatRupiah(p.price)}</div>
+          ${isAdmin ? `<button type="button" class="btn-sugg-custom-price" data-sku="${p.sku}" title="Ubah harga sebelum masuk keranjang">✏️ Atur Harga</button>` : ''}
+        </div>
       </div>
     `;
   });
@@ -455,6 +466,17 @@ searchInput.addEventListener('input', () => {
 });
 
 suggestionsList.addEventListener('click', (e) => {
+  const btnCustom = e.target.closest('.btn-sugg-custom-price');
+  if (btnCustom) {
+    e.stopPropagation();
+    const sku = btnCustom.getAttribute('data-sku');
+    openPriceOverrideModal(sku, false);
+    searchInput.value = '';
+    suggestionsList.style.display = 'none';
+    clearSearchBtn.style.display = 'none';
+    return;
+  }
+
   const itemEl = e.target.closest('.suggestion-item');
   if (!itemEl) return;
   const sku = itemEl.getAttribute('data-sku');
@@ -2137,8 +2159,117 @@ if (btnSaveUser) {
   });
 }
 
+// =============================================================================
+// 14. ATUR HARGA MANUAL / KHUSUS LEBARAN (ADMIN)
+// =============================================================================
+const itemPriceModal = document.getElementById('itemPriceModal');
+const btnCloseItemPrice = document.getElementById('btnCloseItemPrice');
+const overridePriceSku = document.getElementById('overridePriceSku');
+const overridePriceInCart = document.getElementById('overridePriceInCart');
+const overrideItemName = document.getElementById('overrideItemName');
+const overrideItemMeta = document.getElementById('overrideItemMeta');
+const overrideOriginalPrice = document.getElementById('overrideOriginalPrice');
+const overrideNewPriceInput = document.getElementById('overrideNewPriceInput');
+const overrideUpdateMasterCheckbox = document.getElementById('overrideUpdateMasterCheckbox');
+const btnSavePriceOverride = document.getElementById('btnSavePriceOverride');
+
+function openPriceOverrideModal(sku, inCart = false) {
+  if (!state.currentUser || state.currentUser.role !== 'admin') {
+    alert("⚠️ Akses Dibatasi!\nHanya Akun Owner/Admin yang diizinkan untuk mengatur harga khusus/manual.");
+    return;
+  }
+
+  const masterProduct = state.products.find(p => p.sku === sku);
+  const cartItem = inCart ? state.cart.find(c => c.sku === sku) : null;
+  const currentItem = cartItem || masterProduct;
+
+  if (!currentItem) {
+    showToast("⚠️ Data barang tidak ditemukan");
+    return;
+  }
+
+  overridePriceSku.value = sku;
+  overridePriceInCart.value = inCart ? "1" : "0";
+  overrideItemName.innerText = currentItem.name;
+  overrideItemMeta.innerText = currentItem.barcode ? `Barcode: ${currentItem.barcode}` : `SKU: ${currentItem.sku}`;
+  overrideOriginalPrice.innerText = formatRupiah(masterProduct ? masterProduct.price : currentItem.price);
+  overrideNewPriceInput.value = currentItem.price || 0;
+  overrideUpdateMasterCheckbox.checked = false;
+
+  itemPriceModal.classList.add('active');
+  setTimeout(() => {
+    overrideNewPriceInput.focus();
+    overrideNewPriceInput.select();
+  }, 200);
+}
+
+if (btnCloseItemPrice) {
+  btnCloseItemPrice.addEventListener('click', () => {
+    itemPriceModal.classList.remove('active');
+  });
+}
+
+if (btnSavePriceOverride) {
+  btnSavePriceOverride.addEventListener('click', async () => {
+    const sku = overridePriceSku.value;
+    const inCart = overridePriceInCart.value === "1";
+    const newPrice = parseFloat(overrideNewPriceInput.value);
+    const updateMaster = overrideUpdateMasterCheckbox.checked;
+
+    if (isNaN(newPrice) || newPrice < 0) {
+      alert("Harga tidak boleh kosong atau negatif!");
+      overrideNewPriceInput.focus();
+      return;
+    }
+
+    const masterProduct = state.products.find(p => p.sku === sku);
+
+    // 1. Terapkan ke keranjang
+    if (inCart) {
+      const item = state.cart.find(c => c.sku === sku);
+      if (item) {
+        item.price = newPrice;
+        item.subtotal = item.qty * item.price;
+        renderCart();
+      }
+    } else {
+      if (masterProduct) {
+        addToCart({
+          ...masterProduct,
+          price: newPrice
+        });
+      }
+    }
+
+    // 2. Jika opsi simpan permanen ke Cloud dipilih
+    if (updateMaster && masterProduct) {
+      btnSavePriceOverride.disabled = true;
+      btnSavePriceOverride.innerText = "⏳ Menyimpan ke Cloud...";
+      try {
+        const sql = `UPDATE products SET selling_price = ?, updated_at = datetime('now') WHERE sku = ?`;
+        await queryTurso(sql, [newPrice, sku]);
+
+        masterProduct.price = newPrice;
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(state.products));
+        showToast(`✅ Harga '${masterProduct.name}' diubah jadi ${formatRupiah(newPrice)} (Permanen di Cloud)`);
+      } catch (err) {
+        console.error("Gagal update master:", err);
+        alert("⚠️ Gagal simpan ke Cloud: " + (err.message || err));
+      } finally {
+        btnSavePriceOverride.disabled = false;
+        btnSavePriceOverride.innerText = "✓ TERAPKAN HARGA";
+      }
+    } else {
+      showToast(`🏷️ Harga khusus ${formatRupiah(newPrice)} diterapkan (khusus nota ini)`);
+    }
+
+    itemPriceModal.classList.remove('active');
+    playBeep(880, 0.1);
+  });
+}
+
 // ==========================================
-// 14. EVENT LISTENERS GLOBAL & INISIALISASI
+// 15. EVENT LISTENERS GLOBAL & INISIALISASI
 // ==========================================
 document.getElementById('btnClearCart').addEventListener('click', clearCart);
 document.getElementById('btnSync').addEventListener('click', () => syncWithTurso(true));
