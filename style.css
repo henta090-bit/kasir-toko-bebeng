@@ -29,7 +29,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  padding-bottom: 90px; /* Space for bottom checkout bar */
+  padding-bottom: 125px; /* Cukup ruang agar barang terakhir tidak tertutup checkout bar */
 }
 
 /* Top Sticky Wrapper (Header + Search Box terkunci di atas layar) */
@@ -327,6 +327,23 @@ header {
   flex-direction: column;
   gap: 8px;
   animation: fadeIn 0.2s ease-out;
+  transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+}
+
+@keyframes itemHighlightPulse {
+  0% {
+    border-color: var(--accent-emerald);
+    box-shadow: 0 0 0 2px var(--accent-emerald), 0 4px 16px rgba(16, 185, 129, 0.4);
+    background-color: rgba(16, 185, 129, 0.15);
+  }
+  100% {
+    border-color: var(--border-color);
+    box-shadow: none;
+    background-color: var(--bg-card);
+  }
+}
+.cart-item.item-highlight {
+  animation: itemHighlightPulse 1.3s ease-out;
 }
 
 @keyframes fadeIn {
