@@ -301,10 +301,14 @@ function renderCustomerOptions() {
 // 5. KERANJANG BELANJA (CART)
 // ==========================================
 function addToCart(product, qty = 1) {
-  const existing = state.cart.find(item => item.sku === product.sku);
-  if (existing) {
+  const existingIndex = state.cart.findIndex(item => item.sku === product.sku);
+  if (existingIndex > -1) {
+    const existing = state.cart[existingIndex];
     existing.qty += qty;
     existing.subtotal = existing.qty * existing.price;
+    // Pindahkan ke paling bawah agar kasir selalu melihat barang yang barusan discan
+    state.cart.splice(existingIndex, 1);
+    state.cart.push(existing);
   } else {
     state.cart.push({
       sku: product.sku,
@@ -319,12 +323,25 @@ function addToCart(product, qty = 1) {
   playBeep();
   renderCart();
   showToast(`+ ${product.name}`);
+  scrollToBottomCart(product.sku);
+}
 
-  // Scroll otomatis ke item yang baru ditambahkan/diubah di keranjang
+function scrollToBottomCart(sku) {
   setTimeout(() => {
-    const el = document.querySelector(`.cart-item[data-sku="${product.sku}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Scroll mulus sampai ke bagian paling bawah agar barang terakhir terlihat penuh di atas tombol bayar
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: 'smooth'
+    });
+
+    // Berikan efek highlight visual pada kartu barang yang baru ditambahkan/diupdate
+    if (sku) {
+      const el = document.querySelector(`.cart-item[data-sku="${sku}"]`);
+      if (el) {
+        el.classList.remove('item-highlight');
+        void el.offsetWidth; // trigger reflow
+        el.classList.add('item-highlight');
+      }
     }
   }, 60);
 }
