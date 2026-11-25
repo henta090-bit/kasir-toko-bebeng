@@ -1,4 +1,4 @@
-const CACHE_NAME = 'toko-bebeng-pos-v6';
+const CACHE_NAME = 'toko-bebeng-pos-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
