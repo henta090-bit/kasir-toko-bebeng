@@ -32,11 +32,18 @@ body {
   padding-bottom: 90px; /* Space for bottom checkout bar */
 }
 
-/* Header */
-header {
+/* Top Sticky Wrapper (Header + Search Box terkunci di atas layar) */
+.top-sticky-wrapper {
   position: sticky;
   top: 0;
   z-index: 40;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+/* Header */
+header {
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   padding: 10px 14px;
@@ -118,7 +125,7 @@ header {
 
 /* Search and Scan section */
 .search-container {
-  padding: 12px 14px 8px;
+  padding: 10px 14px 10px;
   background: var(--bg-primary);
   display: flex;
   gap: 8px;
@@ -259,7 +266,7 @@ header {
 
 /* Shopping Cart list */
 .cart-header {
-  padding: 6px 14px 6px;
+  padding: 12px 14px 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
