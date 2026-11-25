@@ -319,6 +319,14 @@ function addToCart(product, qty = 1) {
   playBeep();
   renderCart();
   showToast(`+ ${product.name}`);
+
+  // Scroll otomatis ke item yang baru ditambahkan/diubah di keranjang
+  setTimeout(() => {
+    const el = document.querySelector(`.cart-item[data-sku="${product.sku}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 60);
 }
 
 function updateCartQty(sku, newQty) {
