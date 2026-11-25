@@ -13,51 +13,54 @@
   <meta name="apple-mobile-web-app-title" content="Kasir Bebeng">
   <link rel="apple-touch-icon" href="icon.svg">
   
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
-  <!-- Header -->
-  <header>
-    <div class="brand">
-      <span class="brand-icon">🏪</span>
-      <div>
-        <div id="headerStoreName" class="brand-title">TOKO BEBENG</div>
-        <div id="productCountSub" style="font-size: 11px; color: var(--text-muted);">
-          <span id="activeUserBadge" style="color: var(--accent-sky); font-weight: 700;">👤 Masuk</span> • <span id="productCountText">Memuat...</span>
+  <!-- Top Sticky Wrapper (Header + Search Box Terkunci di Atas Saat Scroll) -->
+  <div class="top-sticky-wrapper">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <span class="brand-icon">🏪</span>
+        <div>
+          <div id="headerStoreName" class="brand-title">TOKO BEBENG</div>
+          <div id="productCountSub" style="font-size: 11px; color: var(--text-muted);">
+            <span id="activeUserBadge" style="color: var(--accent-sky); font-weight: 700;">👤 Masuk</span> • <span id="productCountText">Memuat...</span>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="header-actions">
-      <div id="statusBadge" class="status-badge online">
-        <span id="statusDot">●</span> <span id="statusText">Online</span>
+      <div class="header-actions">
+        <div id="statusBadge" class="status-badge online">
+          <span id="statusDot">●</span> <span id="statusText">Online</span>
+        </div>
+        <button id="btnOpenProducts" class="btn-icon" title="Kelola Barang & Ubah Harga" style="display: none;">📦</button>
+        <button id="btnOpenReport" class="btn-icon" title="Laporan & Riwayat Penjualan" style="display: none;">📊</button>
+        <button id="btnOpenSettings" class="btn-icon" title="Pengaturan Printer & Toko" style="display: none;">⚙️</button>
+        <button id="btnUserMenu" class="btn-icon" title="Akun Kasir / Ganti Shift">👤</button>
+        <button id="btnSync" class="btn-icon" title="Sinkronisasi Turso">🔄</button>
       </div>
-      <button id="btnOpenProducts" class="btn-icon" title="Kelola Barang & Ubah Harga" style="display: none;">📦</button>
-      <button id="btnOpenReport" class="btn-icon" title="Laporan & Riwayat Penjualan" style="display: none;">📊</button>
-      <button id="btnOpenSettings" class="btn-icon" title="Pengaturan Printer & Toko" style="display: none;">⚙️</button>
-      <button id="btnUserMenu" class="btn-icon" title="Akun Kasir / Ganti Shift">👤</button>
-      <button id="btnSync" class="btn-icon" title="Sinkronisasi Turso">🔄</button>
+    </header>
+
+    <!-- Offline Warning Banner -->
+    <div id="offlineBanner">
+      ⚠️ Mode Offline: Transaksi tersimpan lokal di HP & akan otomatis di-sync saat online.
     </div>
-  </header>
 
-  <!-- Offline Warning Banner -->
-  <div id="offlineBanner">
-    ⚠️ Mode Offline: Transaksi tersimpan lokal di HP & akan otomatis di-sync saat online.
-  </div>
+    <!-- Search & Barcode Scanner Bar (Locked / Sticky) -->
+    <div class="search-container">
+      <div class="search-box-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Ketik nama / scan barcode..." autocomplete="off">
+        <button id="btnClearSearch" class="clear-search-btn">✕</button>
+      </div>
+      <button id="btnOpenScanner" class="btn-scan">
+        <span>📷</span> SCAN
+      </button>
 
-  <!-- Search & Barcode Scanner Bar -->
-  <div class="search-container">
-    <div class="search-box-wrapper">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" class="search-input" placeholder="Ketik nama / scan barcode..." autocomplete="off">
-      <button id="btnClearSearch" class="clear-search-btn">✕</button>
+      <!-- Live Search Suggestions Dropdown -->
+      <div id="suggestionsList" class="suggestions-list"></div>
     </div>
-    <button id="btnOpenScanner" class="btn-scan">
-      <span>📷</span> SCAN
-    </button>
-
-    <!-- Live Search Suggestions Dropdown -->
-    <div id="suggestionsList" class="suggestions-list"></div>
   </div>
 
   <!-- Cart List Header -->
@@ -534,6 +537,6 @@ tidak dapat ditukar/dikembalikan</textarea>
   <!-- Library Barcode Scanner -->
   <script src="html5-qrcode.min.js"></script>
   <!-- Main Application Logic -->
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
